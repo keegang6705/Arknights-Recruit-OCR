@@ -138,7 +138,7 @@ class ArknightsOCRApp(QMainWindow):
         """)
 
     def init_ui(self):
-        self.setWindowTitle("Arknights OCR Debug (EN/CN Support)")
+        self.setWindowTitle("Arknights Recruitment OCR(EN/CN Support)")
         self.setGeometry(100, 100, 1400, 900)
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
         central_widget = QWidget()
@@ -147,7 +147,7 @@ class ArknightsOCRApp(QMainWindow):
         button_layout = QHBoxLayout()
         self.select_btn = QPushButton("📸 Select Area")
         self.select_btn.clicked.connect(self.select_screen_area)
-        self.run_btn = QPushButton("🔍 Run OCR Debug")
+        self.run_btn = QPushButton("🔍 Run OCR")
         self.run_btn.clicked.connect(self.run_ocr_and_filter)
         self.run_btn.setEnabled(False)
         button_layout.addWidget(self.select_btn)
