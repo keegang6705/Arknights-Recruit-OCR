@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                              QWidget, QPushButton, QLabel, QTextEdit, QListWidget,
                              QSplitter, QMessageBox, QListWidgetItem, QScrollArea)
 from PyQt5.QtCore import Qt, QRect, QPoint, pyqtSignal, QTimer
-from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush
+from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush, QFont
 import pytesseract
 from PIL import Image, ImageGrab, ImageEnhance, ImageDraw
 import cv2
@@ -116,11 +116,14 @@ class ScreenSelector(QWidget):
         super().closeEvent(event)
 
 class ArknightsOCRApp(QMainWindow):
-    def __init__(self):
+    def __init__(self, compact_mode: bool = False):
         super().__init__()
         self.selected_area = None
         self.setup_dark_theme()
-        self.init_ui()
+        if compact_mode :
+            self.init_compact_ui()
+        else:
+            self.init_ui()
 
     def setup_dark_theme(self):
         self.setStyleSheet("""
@@ -129,7 +132,7 @@ class ArknightsOCRApp(QMainWindow):
             QPushButton { background-color: #404040; border: 2px solid #555; padding: 12px; border-radius: 6px; color: white; font-weight: bold; }
             QPushButton:hover { background-color: #505050; border-color: #666; }
             QPushButton:disabled { background-color: #333; color: #666; border-color: #444; }
-            QTextEdit { background-color: #1e1e1e; border: 2px solid #555; color: #00ff00; font-family: Consolas, monospace; font-size: 11px; }
+            QTextEdit { background-color: #1e1e1e; border: 2px solid #555; color: #00ff00; font-family: Consolas, monospace; }
             QListWidget { background-color: #1e1e1e; border: 2px solid #555; color: white; }
             QListWidget::item { padding: 12px; margin: 2px; border-radius: 4px; }
             QListWidget::item:selected { background-color: #555; }
@@ -139,11 +142,13 @@ class ArknightsOCRApp(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle("Arknights Recruitment OCR(EN/CN Support)")
-        self.setGeometry(100, 100, 1400, 900)
+        self.setGeometry(100, 100, 800, 700)
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+
         button_layout = QHBoxLayout()
         self.select_btn = QPushButton("📸 Select Area")
         self.select_btn.clicked.connect(self.select_screen_area)
@@ -153,47 +158,50 @@ class ArknightsOCRApp(QMainWindow):
         button_layout.addWidget(self.select_btn)
         button_layout.addWidget(self.run_btn)
         main_layout.addLayout(button_layout)
+
         self.status_label = QLabel("Select an area on screen to begin OCR analysis (Supports EN/CN)")
         main_layout.addWidget(self.status_label)
+
         splitter = QSplitter(Qt.Horizontal)
+
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
-        left_layout.addWidget(QLabel("📷 Original Selection:"))
-        self.image_preview = QLabel()
-        self.image_preview.setMinimumHeight(150)
-        self.image_preview.setStyleSheet("border: 2px solid #555; background: #1e1e1e;")
-        self.image_preview.setAlignment(Qt.AlignCenter)
-        self.image_preview.setText("No image selected")
-        left_layout.addWidget(self.image_preview)
         left_layout.addWidget(QLabel("🔍 OCR Block Analysis:"))
-        self.analysis_preview_scroll = QScrollArea()
-        self.analysis_preview_scroll.setMinimumHeight(200)
-        self.analysis_preview_scroll.setStyleSheet("border: 2px solid #555; background: #1e1e1e;")
-        self.analysis_preview_scroll.setWidgetResizable(True)
+        
         self.analysis_preview_label = QLabel("Run OCR to see block analysis")
+        self.analysis_preview_label.setMinimumHeight(200)
+        self.analysis_preview_label.setStyleSheet("border: 2px solid #555; background: #1e1e1e;")
         self.analysis_preview_label.setAlignment(Qt.AlignCenter)
         self.analysis_preview_label.setScaledContents(False)
-        self.analysis_preview_scroll.setWidget(self.analysis_preview_label)
-        left_layout.addWidget(self.analysis_preview_scroll)
+        left_layout.addWidget(self.analysis_preview_label)
+
         left_layout.addWidget(QLabel("📝 Raw OCR Output:"))
+
         self.ocr_text = QTextEdit()
         self.ocr_text.setMaximumHeight(120)
         self.ocr_text.setPlaceholderText("OCR raw text will appear here...")
         left_layout.addWidget(self.ocr_text)
+
         left_layout.addWidget(QLabel("🏷️ Detected Tags:"))
+
         self.detected_tags = QTextEdit()
         self.detected_tags.setMaximumHeight(80)
         self.detected_tags.setPlaceholderText("Parsed tags will appear here...")
         left_layout.addWidget(self.detected_tags)
-        splitter.addWidget(left_widget)
+        
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.addWidget(QLabel("⭐ Matching Operators:"))
         self.operators_list = QListWidget()
         right_layout.addWidget(self.operators_list)
+
+        splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
         splitter.setSizes([700, 700])
         main_layout.addWidget(splitter)
+
+    def init_compact_ui(self):
+        self.setWindowTitle("Arknights Recruitment OCR(CompactMode)")
 
     def select_screen_area(self):
         self.hide()
@@ -215,9 +223,6 @@ class ArknightsOCRApp(QMainWindow):
             rect.y() + rect.height()
         ))
         screenshot.save("./temp/preview.png")
-        pixmap = QPixmap("./temp/preview.png")
-        scaled_pixmap = pixmap.scaled(300, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.image_preview.setPixmap(scaled_pixmap)
 
     def preprocess_image_for_ocr(self, image):
         if image.mode != 'L':
@@ -329,8 +334,9 @@ class ArknightsOCRApp(QMainWindow):
             
             analysis_image.save("./temp/analysis.png")
             analysis_pixmap = QPixmap("./temp/analysis.png")
-            self.analysis_preview_label.setPixmap(analysis_pixmap)
-            self.analysis_preview_label.setFixedSize(analysis_pixmap.size())
+            target_size = self.analysis_preview_label.size()
+            scaled_pixmap = analysis_pixmap.scaled(target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.analysis_preview_label.setPixmap(scaled_pixmap)
 
             combined_text = " ".join(all_detected_text)
             
@@ -345,7 +351,7 @@ class ArknightsOCRApp(QMainWindow):
             filtered_operators = self.get_operators_by_tags(detected_tags)
             self.display_filtered_operators(filtered_operators)
 
-            self.status_label.setText(f"✅ Multi-language analysis complete! {len(all_detected_text)} text blocks found, {len(detected_tags)} tags detected, {len(filtered_operators)} combinations found")
+            self.status_label.setText(f"✅analysis complete! {len(all_detected_text)} text blocks found, {len(detected_tags)} tags detected, {len(filtered_operators)} combinations found")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"OCR failed: {str(e)}")
@@ -459,14 +465,18 @@ class ArknightsOCRApp(QMainWindow):
             list_item.setSizeHint(container_widget.sizeHint())
 
 def main():
+    compact_mode = '-C' in sys.argv or '-compact' in sys.argv
     app = QApplication(sys.argv)
+    font = QFont()
+    font.setPointSize(12)
+    app.setFont(font)
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     try:
         pytesseract.get_tesseract_version()
     except:
         QMessageBox.critical(None, "Error", "Tesseract OCR not found! Please install it with Chinese language support.")
         sys.exit(1)
-    window = ArknightsOCRApp()
+    window = ArknightsOCRApp(compact_mode)
     window.show()
     sys.exit(app.exec_())
 
