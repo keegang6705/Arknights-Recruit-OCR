@@ -510,7 +510,9 @@ class ArknightsOCRApp(QMainWindow):
         result = []
         for tags_tuple, ops_list in grouped_by_tags.items():
             ops_list.sort(key=lambda x: x['rarity'], reverse=True)
-            lowest_rarity = min(op['rarity'] for op in ops_list)
+
+            non_one_star_rarities = [op['rarity'] for op in ops_list if op['rarity'] > 1]
+            lowest_rarity = min(non_one_star_rarities) if non_one_star_rarities else 1
             
             result.append({
                 'match_count': len(tags_tuple),
@@ -518,7 +520,9 @@ class ArknightsOCRApp(QMainWindow):
                 'lowest_rarity': lowest_rarity,
                 'operators': ops_list
             })
+
         result.sort(key=lambda x: (x['lowest_rarity'], x['match_count']), reverse=True)
+        
         for item in result:
             del item['lowest_rarity']
             
