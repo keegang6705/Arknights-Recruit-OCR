@@ -3,7 +3,8 @@ import re
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
                              QWidget, QPushButton, QLabel, QTextEdit, QListWidget,
-                             QSplitter, QMessageBox, QListWidgetItem, QScrollArea)
+                             QSplitter, QMessageBox, QListWidgetItem, QScrollArea,
+                             QAbstractItemView, QSlider, QScrollBar, QSizePolicy)
 from PyQt5.QtCore import Qt, QRect, QPoint, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush, QFont
 import pytesseract
@@ -129,15 +130,60 @@ class ArknightsOCRApp(QMainWindow):
         self.setStyleSheet("""
             QMainWindow { background-color: #2b2b2b; color: white; }
             QWidget { background-color: #2b2b2b; color: white; font-family: Consolas, monospace; }
+            
             QPushButton { background-color: #404040; border: 2px solid #555; padding: 12px; border-radius: 6px; color: white; font-weight: bold; }
             QPushButton:hover { background-color: #505050; border-color: #666; }
             QPushButton:disabled { background-color: #333; color: #666; border-color: #444; }
+            
             QTextEdit { background-color: #1e1e1e; border: 2px solid #555; color: #00ff00; font-family: Consolas, monospace; }
+            
             QListWidget { background-color: #1e1e1e; border: 2px solid #555; color: white; }
             QListWidget::item { padding: 12px; margin: 2px; border-radius: 4px; }
             QListWidget::item:selected { background-color: #555; }
+            
             QLabel { color: #ccc; font-weight: bold; padding: 4px; }
             QScrollArea { background-color: #1e1e1e; border: 2px solid #555; }
+
+            QScrollBar:vertical {
+                border: none;
+                background: #2b2b2b;
+                width: 8px;
+                margin: 0px 0px 0px 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: 1f1f1f;
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #555;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+
+            QScrollBar:horizontal {
+                border: none;
+                background: #2b2b2b;
+                height: 8px; 
+                margin: 0px 0px 0px 0px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #555;
+                min-width: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #888;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                border: none;
+                background: none;
+                width: 0px;
+            }
+
         """)
 
     def init_ui(self):
@@ -152,10 +198,11 @@ class ArknightsOCRApp(QMainWindow):
         button_layout = QHBoxLayout()
         self.select_btn = QPushButton("📸 Select Area")
         self.select_btn.clicked.connect(self.select_screen_area)
+        button_layout.addWidget(self.select_btn)
+        
         self.run_btn = QPushButton("🔍 Run OCR")
         self.run_btn.clicked.connect(self.run_ocr_and_filter)
         self.run_btn.setEnabled(False)
-        button_layout.addWidget(self.select_btn)
         button_layout.addWidget(self.run_btn)
         main_layout.addLayout(button_layout)
 
@@ -167,7 +214,7 @@ class ArknightsOCRApp(QMainWindow):
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.addWidget(QLabel("🔍 OCR Block Analysis:"))
-        
+
         self.analysis_preview_label = QLabel("Run OCR to see block analysis")
         self.analysis_preview_label.setMinimumHeight(200)
         self.analysis_preview_label.setStyleSheet("border: 2px solid #555; background: #1e1e1e;")
@@ -193,6 +240,8 @@ class ArknightsOCRApp(QMainWindow):
         right_layout = QVBoxLayout(right_widget)
         right_layout.addWidget(QLabel("⭐ Matching Operators:"))
         self.operators_list = QListWidget()
+        self.operators_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.operators_list.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         right_layout.addWidget(self.operators_list)
 
         splitter.addWidget(left_widget)
@@ -201,7 +250,46 @@ class ArknightsOCRApp(QMainWindow):
         main_layout.addWidget(splitter)
 
     def init_compact_ui(self):
-        self.setWindowTitle("Arknights Recruitment OCR(CompactMode)")
+        self.setWindowTitle("Arknights Recruitment OCR (Compact Mode)")
+        self.setGeometry(200, 200, 500, 600)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+
+        # --- Buttons ---
+        self.select_btn = QPushButton("📸 Select Area")
+        self.select_btn.clicked.connect(self.select_screen_area)
+        main_layout.addWidget(self.select_btn)
+
+        self.run_btn = QPushButton("🔍 Run OCR")
+        self.run_btn.clicked.connect(self.run_ocr_and_filter)
+        self.run_btn.setEnabled(False)
+        main_layout.addWidget(self.run_btn)
+
+        # --- Hidden Components (still initialized, but invisible) ---
+        self.status_label = QLabel("Hidden in compact mode")
+        self.status_label.setVisible(False)
+
+        self.analysis_preview_label = QLabel("Hidden in compact mode")
+        self.analysis_preview_label.setVisible(False)
+
+        self.ocr_text = QTextEdit()
+        self.ocr_text.setVisible(False)
+
+        # --- Visible Compact Components ---
+        main_layout.addWidget(QLabel("🏷️ Detected Tags:"))
+        self.detected_tags = QTextEdit()
+        self.detected_tags.setMaximumHeight(80)
+        self.detected_tags.setPlaceholderText("Parsed tags will appear here...")
+        main_layout.addWidget(self.detected_tags)
+
+        main_layout.addWidget(QLabel("⭐ Matching Operators:"))
+        self.operators_list = QListWidget()
+        self.operators_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.operators_list.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        main_layout.addWidget(self.operators_list)
 
     def select_screen_area(self):
         self.hide()
@@ -425,7 +513,6 @@ class ArknightsOCRApp(QMainWindow):
 
         result.sort(key=lambda x: x['match_count'], reverse=True)
 
-        print(json.dumps(result, indent=2, ensure_ascii=False))
         return result
 
     def display_filtered_operators(self, grouped_operators):
@@ -441,10 +528,14 @@ class ArknightsOCRApp(QMainWindow):
         
         for group in grouped_operators:
             container_widget = QWidget()
+            container_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             layout = QVBoxLayout(container_widget)
-            
+            layout.setContentsMargins(4, 4, 4, 4)
+            layout.setSpacing(2)
+
             tags_label = QLabel(f"Tags: {', '.join(group['tags'])}")
             tags_label.setWordWrap(True)
+            tags_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             layout.addWidget(tags_label)
 
             operator_html = "Operator: "
@@ -457,12 +548,17 @@ class ArknightsOCRApp(QMainWindow):
             operator_label.setText(operator_html)
             operator_label.setTextFormat(Qt.RichText)
             operator_label.setWordWrap(True)
+            operator_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             layout.addWidget(operator_label)
 
             list_item = QListWidgetItem()
             self.operators_list.addItem(list_item)
             self.operators_list.setItemWidget(list_item, container_widget)
+
+            container_widget.resize(self.operators_list.viewport().width(), container_widget.sizeHint().height())
             list_item.setSizeHint(container_widget.sizeHint())
+
+        self.operators_list.updateGeometry()
 
 def main():
     compact_mode = '-C' in sys.argv or '-compact' in sys.argv
