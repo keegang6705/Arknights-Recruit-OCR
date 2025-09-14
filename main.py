@@ -13,6 +13,7 @@ import numpy
 import csv
 import json
 from collections import defaultdict
+from itertools import combinations
 
 arknights_tags_by_category = {
     "Class": {
@@ -386,7 +387,7 @@ class ArknightsOCRApp(QMainWindow):
 
         return ordered_unique_tags
 
-    def get_operators_by_tags(self,input_tags):
+    def get_operators_by_tags(self, input_tags):
         operators = []
         with open('./data/operatordata_en.csv', newline='', encoding='utf-8') as f:
             reader = csv.DictReader(f)
@@ -396,36 +397,30 @@ class ArknightsOCRApp(QMainWindow):
                     'rarity': int(row['rarity']),
                     'tags': [t.strip() for t in row['tags_en'].split(';')]
                 })
-        grouped = defaultdict(list)
-        
-        for op in operators:
-            match_tags = [t for t in op['tags'] if t in input_tags]
-            match_count = len(match_tags)
-            if match_count > 0:
-                grouped[match_count].append({
-                    'tags': match_tags,
-                    'operator': {'name': op['name'], 'rarity': op['rarity']}
-                })
-        
-        result = []
-        for count in sorted(grouped.keys(), reverse=True):
-            for item in grouped[count]:
-                entry = next((r for r in result if r['match_count']==count and r['tags']==item['tags']), None)
-                if entry:
-                    if not any(op['name'] == item['operator']['name'] and op['rarity'] == item['operator']['rarity'] for op in entry['operators']):
-                        entry['operators'].append(item['operator'])
-                else:
-                    result.append({
-                        'match_count': count,
-                        'tags': item['tags'],
-                        'operators': [item['operator']]
-                    })
-        
-        for entry in result:
-            entry['operators'].sort(key=lambda x: x['rarity'], reverse=True)
-        
-        return result
 
+        grouped_by_tags = defaultdict(list)
+
+        for op in operators:
+            match_tags = sorted([t for t in op['tags'] if t in input_tags])
+
+            if match_tags:
+                for r in range(1, len(match_tags) + 1):
+                    for combo in combinations(match_tags, r):
+                        grouped_by_tags[tuple(combo)].append(op)
+
+        result = []
+        for tags_tuple, ops_list in grouped_by_tags.items():
+            ops_list.sort(key=lambda x: x['rarity'], reverse=True)
+            result.append({
+                'match_count': len(tags_tuple),
+                'tags': list(tags_tuple),
+                'operators': ops_list
+            })
+
+        result.sort(key=lambda x: x['match_count'], reverse=True)
+
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return result
 
     def display_filtered_operators(self, grouped_operators):
         self.operators_list.clear()
@@ -441,7 +436,6 @@ class ArknightsOCRApp(QMainWindow):
         for group in grouped_operators:
             container_widget = QWidget()
             layout = QVBoxLayout(container_widget)
-            layout.setContentsMargins(0, 0, 0, 0)
             
             tags_label = QLabel(f"Tags: {', '.join(group['tags'])}")
             tags_label.setWordWrap(True)
@@ -460,14 +454,9 @@ class ArknightsOCRApp(QMainWindow):
             layout.addWidget(operator_label)
 
             list_item = QListWidgetItem()
-            list_item.setSizeHint(container_widget.sizeHint()) 
             self.operators_list.addItem(list_item)
             self.operators_list.setItemWidget(list_item, container_widget)
-            self.operators_list.updateGeometry()
-
-
-
-
+            list_item.setSizeHint(container_widget.sizeHint())
 
 def main():
     app = QApplication(sys.argv)
