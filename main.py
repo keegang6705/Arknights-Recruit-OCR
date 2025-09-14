@@ -137,12 +137,11 @@ class ArknightsOCRApp(QMainWindow):
             QPushButton:disabled { background-color: #333; color: #666; border-color: #444; }
             
             QTextEdit { background-color: #1e1e1e; border: 2px solid #555; color: #00ff00; font-family: Consolas, monospace; }
-            
             QListWidget { background-color: #1e1e1e; border: 2px solid #555; color: white; }
-            QListWidget::item { padding: 12px; margin: 2px; border-radius: 4px; }
+            QListWidget::item { margin: 10px; border-radius: 4px; }
             QListWidget::item:selected { background-color: #555; }
             
-            QLabel { color: #ccc; font-weight: bold; padding: 4px; }
+            QLabel { color: #ccc; font-weight: bold; margin: 2px; }
             QScrollArea { background-color: #1e1e1e; border: 2px solid #555; }
 
             QScrollBar:vertical {
@@ -242,7 +241,7 @@ class ArknightsOCRApp(QMainWindow):
         right_layout.addWidget(QLabel("⭐ Matching Operators:"))
         self.operators_list = QListWidget()
         self.operators_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self.operators_list.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.operators_list.verticalScrollBar().setSingleStep(15)
         right_layout.addWidget(self.operators_list)
 
         splitter.addWidget(left_widget)
@@ -289,7 +288,7 @@ class ArknightsOCRApp(QMainWindow):
         main_layout.addWidget(QLabel("⭐ Matching Operators:"))
         self.operators_list = QListWidget()
         self.operators_list.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self.operators_list.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.operators_list.verticalScrollBar().setSingleStep(15)
         main_layout.addWidget(self.operators_list)
 
     def select_screen_area(self):
@@ -530,7 +529,6 @@ class ArknightsOCRApp(QMainWindow):
         
         for group in grouped_operators:
             container_widget = QWidget()
-            container_widget.resize(self.operators_list.viewport().width()-20,self.operators_list.viewport().height())
             layout = QVBoxLayout(container_widget)
             
             tags_label = QLabel(f"Tags: {', '.join(group['tags'])}")
@@ -552,7 +550,7 @@ class ArknightsOCRApp(QMainWindow):
             list_item = QListWidgetItem()
             self.operators_list.addItem(list_item)
             self.operators_list.setItemWidget(list_item, container_widget)
-            list_item.setSizeHint(container_widget.sizeHint())
+            list_item.setSizeHint(layout.sizeHint())
 
 
 def main():
