@@ -152,12 +152,12 @@ class ArknightsOCRApp(QMainWindow):
                 margin: 0px 0px 0px 0px;
             }
             QScrollBar::handle:vertical {
-                background: 1f1f1f;
+                background: #555;
                 min-height: 20px;
                 border-radius: 4px;
             }
             QScrollBar::handle:vertical:hover {
-                background: #555;
+                background: #888;
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 border: none;
