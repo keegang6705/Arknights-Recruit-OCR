@@ -485,10 +485,16 @@ class ArknightsOCRApp(QMainWindow):
         with open('./data/operatordata_en.csv', newline='', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
+                op_tags = [t.strip() for t in row['tags_en'].split(';')]
+                op_rarity = int(row['rarity'])
+                
+                if op_rarity == 6 and 'Top Operator' not in input_tags:
+                    continue
+                    
                 operators.append({
                     'name': row['name_en'],
-                    'rarity': int(row['rarity']),
-                    'tags': [t.strip() for t in row['tags_en'].split(';')]
+                    'rarity': op_rarity,
+                    'tags': op_tags
                 })
 
         grouped_by_tags = defaultdict(list)
@@ -504,14 +510,18 @@ class ArknightsOCRApp(QMainWindow):
         result = []
         for tags_tuple, ops_list in grouped_by_tags.items():
             ops_list.sort(key=lambda x: x['rarity'], reverse=True)
+            lowest_rarity = min(op['rarity'] for op in ops_list)
+            
             result.append({
                 'match_count': len(tags_tuple),
                 'tags': list(tags_tuple),
+                'lowest_rarity': lowest_rarity,
                 'operators': ops_list
             })
-
-        result.sort(key=lambda x: x['match_count'], reverse=True)
-
+        result.sort(key=lambda x: (x['lowest_rarity'], x['match_count']), reverse=True)
+        for item in result:
+            del item['lowest_rarity']
+            
         return result
 
     def display_filtered_operators(self, grouped_operators):
