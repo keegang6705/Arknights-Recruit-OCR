@@ -530,7 +530,7 @@ class ArknightsOCRApp(QMainWindow):
         
         for group in grouped_operators:
             container_widget = QWidget()
-            container_widget.resize(self.operators_list.viewport().width() - 20)
+            container_widget.resize(self.operators_list.viewport().width()-20,self.operators_list.viewport().height())
             layout = QVBoxLayout(container_widget)
             
             tags_label = QLabel(f"Tags: {', '.join(group['tags'])}")
