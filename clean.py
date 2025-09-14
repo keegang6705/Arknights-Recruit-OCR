@@ -7,7 +7,8 @@ replacing ={"近卫": "Guard",
              "特种": "Specialist",
              "先锋": "Vanguard",
              "女": "Female",
-             "男": "Male"}
+             "男": "Male",
+             '""':'"'}
 
 import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))

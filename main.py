@@ -1,5 +1,5 @@
 import sys
-import json
+import re
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
                              QWidget, QPushButton, QLabel, QTextEdit, QListWidget,
@@ -8,10 +8,10 @@ from PyQt5.QtCore import Qt, QRect, QPoint, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush
 import pytesseract
 from PIL import Image, ImageGrab, ImageEnhance, ImageDraw
-import re
 import cv2
 import numpy
 import csv
+import json
 from collections import defaultdict
 
 arknights_tags_by_category = {
@@ -117,7 +117,6 @@ class ScreenSelector(QWidget):
 class ArknightsOCRApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.tags = self._build_tags_data_structure()
         self.selected_area = None
         self.setup_dark_theme()
         self.init_ui()
@@ -332,7 +331,7 @@ class ArknightsOCRApp(QMainWindow):
             self.analysis_preview_label.setPixmap(analysis_pixmap)
             self.analysis_preview_label.setFixedSize(analysis_pixmap.size())
 
-            combined_text = " ".join(set(all_detected_text))
+            combined_text = " ".join(all_detected_text)
             
             ocr_output = f"MULTI-LANGUAGE SPLIT-BLOCK OCR RESULTS:\n"
             for result in ocr_results:
@@ -342,10 +341,10 @@ class ArknightsOCRApp(QMainWindow):
 
             detected_tags = self.extract_tags_from_text(combined_text)
             self.detected_tags.setPlainText(", ".join(detected_tags) if detected_tags else "No recruitment tags detected")
-            filtered_operators = self.filter_operators_by_tags(detected_tags)
+            filtered_operators = self.get_operators_by_tags(detected_tags)
             self.display_filtered_operators(filtered_operators)
 
-            self.status_label.setText(f"✅ Multi-language analysis complete! {len(all_detected_text)} text blocks found, {len(detected_tags)} tags detected, {len(filtered_operators)} operator combinations matched")
+            self.status_label.setText(f"✅ Multi-language analysis complete! {len(all_detected_text)} text blocks found, {len(detected_tags)} tags detected, {len(filtered_operators)} combinations found")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"OCR failed: {str(e)}")
@@ -356,130 +355,119 @@ class ArknightsOCRApp(QMainWindow):
     def extract_tags_from_text(self, text):
         detected_tags = []
         text_clean = re.sub(r'[^\w\s\u4e00-\u9fff]', ' ', text.upper())
-        
+
+        fuzzy_matches = {
+            "CUARD": "Guard", "GUARD": "Guard", "SNIPER": "Sniper",
+            "DEFENDER": "Defender", "MEDIC": "Medic", "SUPPORTER": "Supporter",
+            "CASTER": "Caster", "SPECIALIST": "Specialist", "VANGUARD": "Vanguard",
+            "MELEE": "Melee", "RANGED": "Ranged", "近卫": "Guard",
+            "狙击": "Sniper", "重装": "Defender", "医疗": "Medic",
+            "辅助": "Supporter", "术师": "Caster", "特种": "Specialist",
+            "先锋": "Vanguard", "近战": "Melee", "远程": "Ranged"
+        }
+
         for category, tags in arknights_tags_by_category.items():
             for eng_tag, chi_tag in tags.items():
                 if eng_tag.upper() in text_clean:
                     detected_tags.append(eng_tag)
                 elif chi_tag and chi_tag in text:
                     detected_tags.append(eng_tag)
-        
-        fuzzy_matches = {
-            "CUARD": "Guard",
-            "GUARD": "Guard", 
-            "SNIPER": "Sniper",
-            "DEFENDER": "Defender",
-            "MEDIC": "Medic",
-            "SUPPORTER": "Supporter",
-            "CASTER": "Caster",
-            "SPECIALIST": "Specialist",
-            "VANGUARD": "Vanguard",
-            "MELEE": "Melee",
-            "RANGED": "Ranged",
-            "近卫": "Guard",
-            "狙击": "Sniper", 
-            "重装": "Defender",
-            "医疗": "Medic",
-            "辅助": "Supporter",
-            "术师": "Caster",
-            "特种": "Specialist",
-            "先锋": "Vanguard",
-            "近战": "Melee",
-            "远程": "Ranged"
-        }
-        
+
         for fuzzy_text, correct_tag in fuzzy_matches.items():
             if fuzzy_text in text_clean or fuzzy_text in text:
                 detected_tags.append(correct_tag)
-        
-        return list(set(detected_tags))
-    
-    def _build_tags_data_structure(self):
-        tags_dict = defaultdict(list)
-        try:
-            with open("./data/operatordata_en.csv", "r", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                next(reader)
-                for row in reader:
-                    if len(row) < 5:
-                        continue
-                    try:
-                        rarity = int(row[3])
-                    except (ValueError, IndexError):
-                        rarity = 0 
-                    
-                    name_en = row[1]
-                    tags_str = row[4]
-                    
-                    if not tags_str:
-                        continue
-                        
-                    tags_list = [tag.strip() for tag in tags_str.split(';') if tag.strip()]
-                    tags_tuple = tuple(sorted(tags_list))
-                    tags_dict[tags_tuple].append((name_en, rarity))
-        except FileNotFoundError:
-            print("Error: operatordata_en.csv not found. Please check the file path.")
-            return {}
-        
-        return dict(tags_dict)
 
-    def filter_operators_by_tags(self, detected_tags):
-        if not detected_tags:
-            return []
+        seen = set()
+        ordered_unique_tags = []
+        for tag in detected_tags:
+            if tag not in seen:
+                seen.add(tag)
+                ordered_unique_tags.append(tag)
+
+        return ordered_unique_tags
+
+    def get_operators_by_tags(self,input_tags):
+        operators = []
+        with open('./data/operatordata_en.csv', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                operators.append({
+                    'name': row['name_en'],
+                    'rarity': int(row['rarity']),
+                    'tags': [t.strip() for t in row['tags_en'].split(';')]
+                })
+        grouped = defaultdict(list)
         
-        matching_combinations = []
-        detected_set = set(detected_tags)
+        for op in operators:
+            match_tags = [t for t in op['tags'] if t in input_tags]
+            match_count = len(match_tags)
+            if match_count > 0:
+                grouped[match_count].append({
+                    'tags': match_tags,
+                    'operator': {'name': op['name'], 'rarity': op['rarity']}
+                })
         
-        for tag_combo, operators in self.tags.items():
-            combo_set = set(tag_combo)
-            if combo_set.issubset(detected_set):
-                for name, rarity in operators:
-                    matching_combinations.append({
-                        'name': name,
-                        'rarity': rarity,
-                        'tags': list(tag_combo),
-                        'matched_tags': len(tag_combo)
+        result = []
+        for count in sorted(grouped.keys(), reverse=True):
+            for item in grouped[count]:
+                entry = next((r for r in result if r['match_count']==count and r['tags']==item['tags']), None)
+                if entry:
+                    if not any(op['name'] == item['operator']['name'] and op['rarity'] == item['operator']['rarity'] for op in entry['operators']):
+                        entry['operators'].append(item['operator'])
+                else:
+                    result.append({
+                        'match_count': count,
+                        'tags': item['tags'],
+                        'operators': [item['operator']]
                     })
         
-        matching_combinations.sort(key=lambda x: (x['rarity'], x['matched_tags']), reverse=True)
+        for entry in result:
+            entry['operators'].sort(key=lambda x: x['rarity'], reverse=True)
         
-        return matching_combinations
+        return result
 
-    def display_filtered_operators(self, operators):
+
+    def display_filtered_operators(self, grouped_operators):
         self.operators_list.clear()
+        RARITY_COLOR = {
+            1: '#FFFFFF',
+            2: '#9E9E1E',
+            3: '#0398D0',
+            4: '#CFB6CF',
+            5: '#FFE916',
+            6: "#FF8400"
+        }
         
-        if not operators:
-            item = QListWidgetItem("No matching operator combinations found")
-            item.setBackground(QBrush(QColor(60, 60, 60)))
-            item.setForeground(QBrush(QColor(200, 200, 200)))
-            self.operators_list.addItem(item)
-            return
-        
-        for operator in operators:
-            name = operator['name']
-            rarity = operator['rarity']
-            tags = operator['tags']
-            matched_count = operator['matched_tags']
+        for group in grouped_operators:
+            container_widget = QWidget()
+            layout = QVBoxLayout(container_widget)
+            layout.setContentsMargins(0, 0, 0, 0)
             
-            display_text = f"{'⭐' * rarity} {name}"
-            display_text += f"\n🎯 Matched Tags ({matched_count}): {', '.join(tags)}"
-            
-            item = QListWidgetItem(display_text)
-            
-            if rarity == 4:
-                item.setBackground(QBrush(QColor(120, 150, 255)))
-                item.setForeground(QBrush(QColor(255, 255, 255)))
-            elif rarity == 5:
-                item.setBackground(QBrush(QColor(255, 215, 0)))
-                item.setForeground(QBrush(QColor(0, 0, 0)))
-            elif rarity >= 6:
-                item.setBackground(QBrush(QColor(255, 140, 0)))
-                item.setForeground(QBrush(QColor(0, 0, 0)))
-            else:
-                item.setBackground(QBrush(QColor(108, 123, 127)))
-                item.setForeground(QBrush(QColor(255, 255, 255)))
-            
-            self.operators_list.addItem(item)
+            tags_label = QLabel(f"Tags: {', '.join(group['tags'])}")
+            tags_label.setWordWrap(True)
+            layout.addWidget(tags_label)
+
+            operator_html = "Operator: "
+            for op in group['operators']:
+                color = RARITY_COLOR.get(op['rarity'], "#FFFFFF")
+                operator_html += f'<span style="color:{color}">{op["name"]}</span>, '
+            operator_html = operator_html.rstrip(", ")
+
+            operator_label = QLabel()
+            operator_label.setText(operator_html)
+            operator_label.setTextFormat(Qt.RichText)
+            operator_label.setWordWrap(True)
+            layout.addWidget(operator_label)
+
+            list_item = QListWidgetItem()
+            list_item.setSizeHint(container_widget.sizeHint()) 
+            self.operators_list.addItem(list_item)
+            self.operators_list.setItemWidget(list_item, container_widget)
+            self.operators_list.updateGeometry()
+
+
+
+
 
 def main():
     app = QApplication(sys.argv)
