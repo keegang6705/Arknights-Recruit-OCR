@@ -4,8 +4,9 @@ import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
                              QWidget, QPushButton, QLabel, QTextEdit, QListWidget,
                              QSplitter, QMessageBox, QListWidgetItem, QScrollArea,
-                             QAbstractItemView, QSlider, QScrollBar, QSizePolicy)
-from PyQt5.QtCore import Qt, QRect, QPoint, pyqtSignal, QTimer
+                             QAbstractItemView, QSlider, QScrollBar, QSizePolicy,
+                             QListView, QLayout)
+from PyQt5.QtCore import Qt, QRect, QPoint, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush, QFont
 import pytesseract
 from PIL import Image, ImageGrab, ImageEnhance, ImageDraw
@@ -251,7 +252,7 @@ class ArknightsOCRApp(QMainWindow):
 
     def init_compact_ui(self):
         self.setWindowTitle("Arknights Recruitment OCR (Compact Mode)")
-        self.setGeometry(200, 200, 500, 600)
+        self.setGeometry(0, 100, 600, 1000)
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
         central_widget = QWidget()
@@ -403,7 +404,6 @@ class ArknightsOCRApp(QMainWindow):
                     processed_image = self.auto_crop_image_adaptive(block_image)
                     processed_image = self.preprocess_image_for_ocr(processed_image)
                     processed_image.save(block_filename)
-                    print(f"Saved debug image to {block_filename}")
                     
                     multilang_results = self.run_ocr_multilang(processed_image, lang_configs)
                     
@@ -517,9 +517,11 @@ class ArknightsOCRApp(QMainWindow):
 
     def display_filtered_operators(self, grouped_operators):
         self.operators_list.clear()
+        self.operators_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
         RARITY_COLOR = {
             1: '#FFFFFF',
-            2: '#9E9E1E',
+            2: '#9E9E1E', 
             3: '#0398D0',
             4: '#CFB6CF',
             5: '#FFE916',
@@ -528,14 +530,11 @@ class ArknightsOCRApp(QMainWindow):
         
         for group in grouped_operators:
             container_widget = QWidget()
-            container_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            container_widget.resize(self.operators_list.viewport().width() - 20)
             layout = QVBoxLayout(container_widget)
-            layout.setContentsMargins(4, 4, 4, 4)
-            layout.setSpacing(2)
-
+            
             tags_label = QLabel(f"Tags: {', '.join(group['tags'])}")
             tags_label.setWordWrap(True)
-            tags_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             layout.addWidget(tags_label)
 
             operator_html = "Operator: "
@@ -548,17 +547,13 @@ class ArknightsOCRApp(QMainWindow):
             operator_label.setText(operator_html)
             operator_label.setTextFormat(Qt.RichText)
             operator_label.setWordWrap(True)
-            operator_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             layout.addWidget(operator_label)
 
             list_item = QListWidgetItem()
             self.operators_list.addItem(list_item)
             self.operators_list.setItemWidget(list_item, container_widget)
-
-            container_widget.resize(self.operators_list.viewport().width(), container_widget.sizeHint().height())
             list_item.setSizeHint(container_widget.sizeHint())
 
-        self.operators_list.updateGeometry()
 
 def main():
     compact_mode = '-C' in sys.argv or '-compact' in sys.argv
