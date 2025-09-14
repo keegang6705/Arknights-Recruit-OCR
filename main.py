@@ -500,7 +500,7 @@ class ArknightsOCRApp(QMainWindow):
         grouped_by_tags = defaultdict(list)
 
         for op in operators:
-            match_tags = sorted([t for t in op['tags'] if t in input_tags])
+            match_tags = [t for t in input_tags if t in op['tags']]
 
             if match_tags:
                 for r in range(1, len(match_tags) + 1):
@@ -510,7 +510,7 @@ class ArknightsOCRApp(QMainWindow):
         result = []
         for tags_tuple, ops_list in grouped_by_tags.items():
             ops_list.sort(key=lambda x: x['rarity'], reverse=True)
-
+            
             non_one_star_rarities = [op['rarity'] for op in ops_list if op['rarity'] > 1]
             lowest_rarity = min(non_one_star_rarities) if non_one_star_rarities else 1
             
