@@ -453,7 +453,7 @@ class ArknightsOCRApp(QMainWindow):
 
     def extract_tags_from_text(self, text):
         detected_tags = []
-        text_clean = re.sub(r'[^\w\s\u4e00-\u9fff]', ' ', text.upper())
+        text_clean = re.sub(r'[^\w\s\u4e00-\u9fff\-]', ' ', text.upper())
 
         fuzzy_matches = {
             "CUARD": "Guard", "GUARD": "Guard", "SNIPER": "Sniper",
