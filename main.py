@@ -16,6 +16,7 @@ import csv
 import json
 from collections import defaultdict
 from itertools import combinations
+from langdetect import detect
 
 arknights_tags_by_category = {
     "Class": {
@@ -345,24 +346,26 @@ class ArknightsOCRApp(QMainWindow):
             print(f"Auto-crop failed: {e}")
             return image_pillow
     
-    def run_ocr_multilang(self, image, lang_configs):
-        all_results = []
-        
-        for lang_name, config in lang_configs.items():
-            try:
-                result = pytesseract.image_to_string(image, config=config).strip()
-                if result:
-                    all_results.append(f"[{lang_name}] {result}")
-            except Exception as e:
-                all_results.append(f"[{lang_name}] Error: {str(e)}")
-        
-        return all_results
-    
+    def detect_language_from_image(self, image):
+        try:
+            temp_text = pytesseract.image_to_string(image, config="--psm 6 -l eng").strip()
+            if not temp_text:
+                temp_text = pytesseract.image_to_string(image, config="--psm 6 -l chi_sim").strip()
+            if not temp_text:
+                return "ENG"
+            lang = detect(temp_text)
+            if lang.startswith("zh"):
+                return "CHI"
+            else:
+                return "ENG"
+        except Exception:
+            return "ENG"
+
     def run_ocr_and_filter(self):
         if not self.selected_area:
             return
         try:
-            self.status_label.setText("🔄 Running comprehensive multi-language OCR analysis...")
+            self.status_label.setText("🔄 Running language-detection OCR analysis...")
             QApplication.processEvents()
             screenshot = ImageGrab.grab(bbox=(
                 self.selected_area.x(), self.selected_area.y(),
@@ -383,7 +386,7 @@ class ArknightsOCRApp(QMainWindow):
             ocr_results = []
             
             lang_configs = {
-                "ENG": '--psm 6 -l eng -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_',
+                "ENG": '--psm 6 -l eng -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-',
                 "CHI": '--psm 6 -l chi_sim',
             }
             
@@ -392,6 +395,8 @@ class ArknightsOCRApp(QMainWindow):
 
             for row in range(num_rows):
                 for col in range(num_cols):
+                    if row == 1 and col == 2:
+                        continue
                     x1 = int(col * block_width)
                     y1 = int(row * block_height)
                     x2 = int((col + 1) * block_width)
@@ -404,20 +409,20 @@ class ArknightsOCRApp(QMainWindow):
                     processed_image = self.preprocess_image_for_ocr(processed_image)
                     processed_image.save(block_filename)
                     
-                    multilang_results = self.run_ocr_multilang(processed_image, lang_configs)
+                    lang_choice = self.detect_language_from_image(processed_image)
+                    ocr_config = lang_configs.get(lang_choice, lang_configs["ENG"])
                     
+                    try:
+                        final_text = pytesseract.image_to_string(processed_image, config=ocr_config).strip()
+                    except Exception as e:
+                        final_text = f"Error: {str(e)}"
+
                     block_texts = []
-                    for result in multilang_results:
-                        if not result.startswith("[") or "Error" not in result:
-                            if "] " in result:
-                                text = result.split("] ", 1)[1]
-                                if text and text not in block_texts:
-                                    block_texts.append(text)
-                                    all_detected_text.append(text)
+                    if final_text and not final_text.startswith("Error"):
+                        block_texts.append(final_text)
+                        all_detected_text.append(final_text)
                     
-                    ocr_results.append(f"Block ({row+1},{col+1}):")
-                    for result in multilang_results:
-                        ocr_results.append(f"  {result}")
+                    ocr_results.append(f"Block ({row+1},{col+1}) [{lang_choice}]: {final_text if final_text else '---'}")
             
             analysis_image.save("./temp/analysis.png")
             analysis_pixmap = QPixmap("./temp/analysis.png")
@@ -427,7 +432,7 @@ class ArknightsOCRApp(QMainWindow):
 
             combined_text = " ".join(all_detected_text)
             
-            ocr_output = f"MULTI-LANGUAGE SPLIT-BLOCK OCR RESULTS:\n"
+            ocr_output = f"LANGUAGE-DETECTED SPLIT-BLOCK OCR RESULTS:\n"
             for result in ocr_results:
                 ocr_output += f"{result}\n"
             ocr_output += f"\nCOMBINED TEXT: {combined_text}"
@@ -438,7 +443,7 @@ class ArknightsOCRApp(QMainWindow):
             filtered_operators = self.get_operators_by_tags(detected_tags)
             self.display_filtered_operators(filtered_operators)
 
-            self.status_label.setText(f"✅analysis complete! {len(all_detected_text)} text blocks found, {len(detected_tags)} tags detected, {len(filtered_operators)} combinations found")
+            self.status_label.setText(f"✅ analysis complete! {len(all_detected_text)} text blocks found, {len(detected_tags)} tags detected, {len(filtered_operators)} combinations found")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"OCR failed: {str(e)}")
@@ -462,13 +467,15 @@ class ArknightsOCRApp(QMainWindow):
 
         for category, tags in arknights_tags_by_category.items():
             for eng_tag, chi_tag in tags.items():
-                if eng_tag.upper() in text_clean:
+                pattern = r"\b" + re.escape(eng_tag.upper()) + r"\b"
+                if re.search(pattern, text_clean, re.IGNORECASE):
                     detected_tags.append(eng_tag)
                 elif chi_tag and chi_tag in text:
                     detected_tags.append(eng_tag)
 
         for fuzzy_text, correct_tag in fuzzy_matches.items():
-            if fuzzy_text in text_clean or fuzzy_text in text:
+            pattern = r"\b" + re.escape(fuzzy_text.upper()) + r"\b"
+            if re.search(pattern, text_clean, re.IGNORECASE) or fuzzy_text in text:
                 detected_tags.append(correct_tag)
 
         seen = set()
