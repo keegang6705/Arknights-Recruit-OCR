@@ -3,9 +3,8 @@ import re
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout,
                              QWidget, QPushButton, QLabel, QTextEdit, QListWidget,
-                             QSplitter, QMessageBox, QListWidgetItem, QScrollArea,
-                             QAbstractItemView, QSlider, QScrollBar, QSizePolicy,
-                             QListView, QLayout)
+                             QSplitter, QMessageBox, QListWidgetItem,
+                             QAbstractItemView)
 from PyQt5.QtCore import Qt, QRect, QPoint, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush, QFont
 import pytesseract
