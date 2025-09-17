@@ -344,23 +344,17 @@ class ArknightsOCRApp(QMainWindow):
         except Exception as e:
             print(f"Auto-crop failed: {e}")
             return image_pillow
-    
-    def detect_language_from_image(self, image):
+        
+    def detect_language_and_text(self, image):
         try:
-            temp_text = pytesseract.image_to_string(image, config="--psm 6 -l chi_sim+eng").strip()
-            if not temp_text:
-                return "ENG"
-
-            if re.search(r'[\u4e00-\u9fff]', temp_text):
-                return "CHI"
-
-            lang = detect(temp_text)
-            if lang.startswith("zh"):
-                return "CHI"
-            else:
-                return "ENG"
+            text = pytesseract.image_to_string(image, config="--psm 6 -l chi_sim+eng").strip()
+            if not text:
+                return "ENG", ""
+            if re.search(r'[\u4e00-\u9fff]', text):
+                return "CHI", text
+            return "ENG", text
         except Exception:
-            return "ENG"
+            return "ENG", ""
 
     def run_ocr_and_filter(self):
         if not self.selected_area:
@@ -368,6 +362,7 @@ class ArknightsOCRApp(QMainWindow):
         try:
             self.status_label.setText("🔄 Running language-detection OCR analysis...")
             QApplication.processEvents()
+
             screenshot = ImageGrab.grab(bbox=(
                 self.selected_area.x(), self.selected_area.y(),
                 self.selected_area.x() + self.selected_area.width(),
@@ -386,11 +381,6 @@ class ArknightsOCRApp(QMainWindow):
             all_detected_text = []
             ocr_results = []
             
-            lang_configs = {
-                "ENG": '--psm 6 -l eng -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-',
-                "CHI": '--psm 6 -l chi_sim',
-            }
-            
             split_block_color = (0, 255, 0)
             split_block_outline_width = 3
 
@@ -402,28 +392,22 @@ class ArknightsOCRApp(QMainWindow):
                     y1 = int(row * block_height)
                     x2 = int((col + 1) * block_width)
                     y2 = int((row + 1) * block_height)
+
                     draw.rectangle([x1, y1, x2, y2], outline=split_block_color, width=split_block_outline_width)
                     block_image = screenshot.crop((x1, y1, x2, y2))
                     block_filename = os.path.join("./temp/", f"block_r{row}_c{col}.png")
-                    
+
                     processed_image = self.auto_crop_image_adaptive(block_image)
                     processed_image = self.preprocess_image_for_ocr(processed_image)
                     processed_image.save(block_filename)
-                    
-                    lang_choice = self.detect_language_from_image(processed_image)
-                    ocr_config = lang_configs.get(lang_choice, lang_configs["ENG"])
-                    
-                    try:
-                        final_text = pytesseract.image_to_string(processed_image, config=ocr_config).strip()
-                    except Exception as e:
-                        final_text = f"Error: {str(e)}"
 
-                    block_texts = []
-                    if final_text and not final_text.startswith("Error"):
-                        block_texts.append(final_text)
+                    lang_choice, final_text = self.detect_language_and_text(processed_image)
+
+                    if final_text:
                         all_detected_text.append(final_text)
-                    
-                    ocr_results.append(f"Block ({row+1},{col+1}) [{lang_choice}]: {final_text if final_text else '---'}")
+                        ocr_results.append(f"Block ({row+1},{col+1}) [{lang_choice}]: {final_text}")
+                    else:
+                        ocr_results.append(f"Block ({row+1},{col+1}) [{lang_choice}]: ---")
             
             analysis_image.save("./temp/analysis.png")
             analysis_pixmap = QPixmap("./temp/analysis.png")
@@ -433,7 +417,7 @@ class ArknightsOCRApp(QMainWindow):
 
             combined_text = " ".join(all_detected_text)
             
-            ocr_output = f"LANGUAGE-DETECTED SPLIT-BLOCK OCR RESULTS:\n"
+            ocr_output = "LANGUAGE-DETECTED SPLIT-BLOCK OCR RESULTS:\n"
             for result in ocr_results:
                 ocr_output += f"{result}\n"
             ocr_output += f"\nCOMBINED TEXT: {combined_text}"
