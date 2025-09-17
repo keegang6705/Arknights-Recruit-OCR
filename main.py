@@ -345,7 +345,7 @@ class ArknightsOCRApp(QMainWindow):
             print(f"Auto-crop failed: {e}")
             return image_pillow
     
-    def detect_language_from_image(image):
+    def detect_language_from_image(self, image):
         try:
             temp_text = pytesseract.image_to_string(image, config="--psm 6 -l chi_sim+eng").strip()
             if not temp_text:
